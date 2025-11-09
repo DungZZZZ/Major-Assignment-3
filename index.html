@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Author Network Force Layout - Assignment 3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- D3.js -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel-bg: #111827;
+      --accent: #38bdf8;
+      --muted: #6b7280;
+      --border-subtle: rgba(148, 163, 253, 0.25);
+      --font: system-ui, -apple-system, BlinkMacSystemFont, -system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font);
+      background: radial-gradient(circle at top, #111827 0, #020817 55%, #000 100%);
+      color: #e5e7eb;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 14px 24px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      border-bottom: 1px solid rgba(148, 163, 253, 0.18);
+      backdrop-filter: blur(16px);
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: #f9fafb;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    #container {
+      flex: 1;
+      display: flex;
+      gap: 14px;
+      padding: 14px 14px 16px;
+      min-height: 0;
+    }
+
+    #left-panel {
+      flex: 0 0 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px 14px 12px;
+      border-radius: 20px;
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.07), transparent),
+                  radial-gradient(circle at bottom, rgba(79, 70, 229, 0.05), transparent),
+                  var(--panel-bg);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.9);
+    }
+
+    #left-panel h2 {
+      margin: 0 0 4px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e5e7eb;
+    }
+
+    .sub-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .control-group {
+      margin-bottom: 8px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      margin-bottom: 2px;
+      color: var(--muted);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 999px;
+      background: #111827;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+    }
+
+    #legend {
+      margin-top: 4px;
+      padding: 6px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(75, 85, 99, 0.6);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 6px;
+      align-items: flex-start;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      color: #9ca3af;
+      padding: 1px 5px 2px;
+      border-radius: 999px;
+      background: rgba(17, 24, 39, 0.98);
+      border: 1px solid rgba(75, 85, 99, 0.6);
+      white-space: nowrap;
+    }
+
+    .legend-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+    }
+
+    #network-wrapper {
+      flex: 1;
+      position: relative;
+      border-radius: 22px;
+      background: radial-gradient(circle at top, rgba(31, 41, 55, 0.6), rgba(2, 6, 23, 0.98));
+      border: 1px solid rgba(75, 85, 99, 0.6);
+      box-shadow: 0 22px 60px rgba(15, 23, 42, 0.85);
+      overflow: hidden;
+    }
+
+    #network-header {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      padding: 4px 9px;
+      font-size: 10px;
+      color: #9ca3af;
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.08), rgba(15, 23, 42, 0.98));
+      border-radius: 999px;
+      border: 1px solid rgba(75, 85, 99, 0.6);
+      backdrop-filter: blur(10px);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #network-header span {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    #network svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    line.link {
+      stroke: rgba(148, 163, 253, 0.16);
+      stroke-width: 0.6px;
+    }
+
+    circle.node {
+      stroke: #020817;
+      stroke-width: 0.8px;
+      cursor: pointer;
+      transition: opacity 0.2s ease, r 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    circle.node:hover {
+      stroke-width: 1.2px;
+    }
+
+    #tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.16), rgba(17, 24, 39, 1));
+      border-radius: 16px;
+      padding: 9px 10px 8px;
+      font-size: 10px;
+      color: #e5e7eb;
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      box-shadow: 0 14px 40px rgba(15, 23, 42, 0.95);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 20;
+      max-width: 260px;
+      backdrop-filter: blur(18px);
+      white-space: normal;
+    }
+
+    #tooltip .name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #f9fafb;
+      margin-bottom: 2px;
+    }
+
+    #tooltip .affiliation {
+      font-size: 9px;
+      color: #9ca3af;
+      margin-bottom: 2px;
+    }
+
+    #tooltip .meta {
+      font-size: 9px;
+      color: #9ca3af;
+    }
+
+    #status {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        overflow: auto;
+        height: auto;
+      }
+
+      #container {
+        flex-direction: column;
+        height: auto;
+      }
+
+      #left-panel {
+        flex: 0 0 auto;
+        width: 100%;
+      }
+
+      #network-wrapper {
+        height: 540px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Author Co-Authorship Force Layout</h1>
+      <p>Colored by top affiliation countries · Node size by degree · Interactive forces</p>
+    </div>
+    <p>Data source: Scopus CSV · D3.js Force Simulation</p>
+  </header>
+
+  <div id="container">
+    <aside id="left-panel">
+      <h2>Force Controls</h2>
+      <div class="sub-label">Adjust layout physics to explore the network.</div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Charge Strength</span>
+          <span id="chargeValue"></span>
+        </div>
+        <input type="range" id="chargeSlider" min="-220" max="-10" step="5" value="-80" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Collision Padding</span>
+          <span id="collideValue"></span>
+        </div>
+        <input type="range" id="collideSlider" min="0" max="26" step="1" value="8" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Link Strength</span>
+          <span id="linkStrengthValue"></span>
+        </div>
+        <input type="range" id="linkStrengthSlider" min="0.05" max="1" step="0.05" value="0.25" />
+      </div>
+
+      <div class="sub-label">
+        Hover a node: highlight authors with the same affiliation.  
+        Click a node: show author details.
+      </div>
+
+      <h2>Country Legend</h2>
+      <div class="sub-label">Top 10 affiliation countries are color-coded; others are grouped as "Others".</div>
+      <div id="legend"></div>
+
+      <div id="status"></div>
+    </aside>
+
+    <section id="network-wrapper">
+      <div id="network-header">
+        <span>● Nodes: authors</span>
+        <span>— Links: shared publications</span>
+        <span>○ Radius: degree (collaborations)</span>
+      </div>
+      <div id="network"></div>
+    </section>
+  </div>
+
+  <div id="tooltip"></div>
+
+  <script>
+    // --- Config ---
+    const csvPath = "data_scopus.csv"; 
+    const width = document.getElementById("network-wrapper").clientWidth;
+    const height = document.getElementById("network-wrapper").clientHeight;
+
+    const legendContainer = d3.select("#legend");
+    const statusEl = d3.select("#status");
+    const tooltip = d3.select("#tooltip");
+
+    const chargeSlider = d3.select("#chargeSlider");
+    const collideSlider = d3.select("#collideSlider");
+    const linkStrengthSlider = d3.select("#linkStrengthSlider");
+
+    const chargeValue = d3.select("#chargeValue");
+    const collideValue = d3.select("#collideValue");
+    const linkStrengthValue = d3.select("#linkStrengthValue");
+
+    function updateControlLabels() {
+      chargeValue.text(chargeSlider.node().value);
+      collideValue.text(collideSlider.node().value);
+      linkStrengthValue.text(linkStrengthSlider.node().value);
+    }
+    updateControlLabels();
+
+    const svg = d3.select("#network")
+      .append("svg")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("preserveAspectRatio", "xMidYMid meet");
+
+    // --- Data Loading & Preparation ---
+    d3.csv(csvPath).then(raw => {
+      // 1. Filter invalid rows (Year, Authors, Authors with affiliations required)
+      const rows = raw.filter(d =>
+        d.Year &&
+        d.Authors &&
+        d["Authors with affiliations"]
+      );
+
+      // Maps
+      const authorMap = new Map(); // id -> node
+      const linkMap = new Map();   // "a|b" -> link object (to merge duplicates)
+
+      // Helper: parse authors with affiliations
+      function parseAuthorsWithAffiliations(row) {
+        const field = row["Authors with affiliations"];
+        if (!field) return [];
+
+        return field
+          .split(";")
+          .map(s => s.trim())
+          .filter(s => s.length > 0)
+          .map(entry => {
+            // Heuristic: "Last, F., Affil..., Country"
+            const parts = entry.split(",").map(p => p.trim()).filter(Boolean);
+            if (parts.length < 2) {
+              return null;
+            }
+            const name = parts[0]; // up to first comma
+            const country = parts[parts.length - 1] || "Unknown";
+            const affiliation = parts.slice(1, -1).join(", ").trim() || "Unknown affiliation";
+
+            return {
+              name,
+              affiliation,
+              country
+            };
+          })
+          .filter(d => d && d.name && d.affiliation);
+      }
+
+      rows.forEach(row => {
+        const year = +row.Year;
+        if (!year || isNaN(year)) return;
+
+        const parsed = parseAuthorsWithAffiliations(row);
+        if (!parsed.length) return;
+
+        // Unique authors within this paper
+        const uniqueAuthors = Array.from(
+          d3.group(parsed, d => d.name).values()
+        ).map(group => group[0]);
+
+        // Register authors
+        uniqueAuthors.forEach(a => {
+          if (!authorMap.has(a.name)) {
+            authorMap.set(a.name, {
+              id: a.name,
+              name: a.name,
+              affiliation: a.affiliation,
+              country: a.country || "Unknown",
+              papers: new Set(),
+              degree: 0
+            });
+          }
+          const node = authorMap.get(a.name);
+          node.affiliation = a.affiliation || node.affiliation;
+          node.country = a.country || node.country;
+          node.papers.add(row.EID || row.Title || `${row.Year}`);
+        });
+
+        // Build links for all pairs of co-authors in this paper
+        for (let i = 0; i < uniqueAuthors.length; i++) {
+          for (let j = i + 1; j < uniqueAuthors.length; j++) {
+            const a = uniqueAuthors[i].name;
+            const b = uniqueAuthors[j].name;
+            if (!authorMap.has(a) || !authorMap.has(b)) continue;
+
+            const [s, t] = a < b ? [a, b] : [b, a];
+            const key = s + "|" + t;
+
+            if (!linkMap.has(key)) {
+              linkMap.set(key, {
+                source: s,
+                target: t,
+                weight: 1
+              });
+            } else {
+              linkMap.get(key).weight += 1;
+            }
+          }
+        }
+      });
+
+      const nodes = Array.from(authorMap.values());
+      const links = Array.from(linkMap.values());
+
+
+      // Compute node degree from links
+      links.forEach(l => {
+        authorMap.get(l.source).degree++;
+        authorMap.get(l.target).degree++;
+      });
+
+      // Remove isolated nodes if any (degree = 0)
+      const filteredNodes = nodes.filter(n => n.degree > 0);
+      const nodeIds = new Set(filteredNodes.map(n => n.id));
+      const filteredLinks = links.filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
+
+      // Update papers count as primitive number
+      filteredNodes.forEach(n => {
+        n.paperCount = n.papers.size;
+      });
+
+      statusEl.text(
+        `Loaded ${rows.length} valid records · ` +
+        `${filteredNodes.length} authors · ${filteredLinks.length} co-authorship links`
+      );
+
+      // --- Scales: Node size, Color (Top 10 countries) ---
+      const degreeExtent = d3.extent(filteredNodes, d => d.degree);
+      const rScale = d3.scaleSqrt()
+        .domain(degreeExtent[0] === degreeExtent[1]
+          ? [0, degreeExtent[1] || 1]
+          : degreeExtent)
+        .range([3, 12]);
+
+      // Count authors per country
+      const countryCounts = d3.rollup(
+        filteredNodes,
+        v => v.length,
+        d => d.country || "Unknown"
+      );
+
+      const topCountries = Array.from(countryCounts.entries())
+        .sort((a, b) => d3.descending(a[1], b[1]))
+        .slice(0, 10)
+        .map(d => d[0]);
+
+      const color = d3.scaleOrdinal()
+        .domain(topCountries)
+        .range(d3.schemeTableau10);
+
+      // Build legend
+      legendContainer.selectAll("*").remove();
+      topCountries.forEach(c => {
+        legendContainer.append("div")
+          .attr("class", "legend-item")
+          .html(`
+            <span class="legend-swatch" style="background:${color(c)};"></span>
+            <span>${c}</span>
+          `);
+      });
+      legendContainer.append("div")
+        .attr("class", "legend-item")
+        .html(`
+          <span class="legend-swatch" style="background:#A9A9A9;"></span>
+          <span>Others</span>
+        `);
+
+      // --- Simulation ---
+      let chargeStrength = +chargeSlider.node().value;
+      let collidePadding = +collideSlider.node().value;
+      let linkStrength = +linkStrengthSlider.node().value;
+
+      const simulation = d3.forceSimulation(filteredNodes)
+        .force("link", d3.forceLink(filteredLinks)
+          .id(d => d.id)
+          .distance(d => 40 - Math.min(d.weight - 1, 10)) // closer if more shared papers
+          .strength(linkStrength))
+        .force("charge", d3.forceManyBody().strength(chargeStrength))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collide", d3.forceCollide().radius(d => rScale(d.degree) + collidePadding));
+
+      // --- Draw links & nodes ---
+      const link = svg.append("g")
+        .attr("stroke-linecap", "round")
+        .selectAll("line")
+        .data(filteredLinks)
+        .join("line")
+        .attr("class", "link")
+        .attr("stroke-opacity", 0.16)
+        .attr("stroke-width", d => Math.min(0.4 + d.weight * 0.25, 2));
+
+      const node = svg.append("g")
+        .selectAll("circle")
+        .data(filteredNodes)
+        .join("circle")
+        .attr("class", "node")
+        .attr("r", d => rScale(d.degree))
+        .attr("fill", d =>
+          topCountries.includes(d.country) ? color(d.country) : "#A9A9A9"
+        )
+        .on("mouseover", handleMouseOver)
+        .on("mouseout", handleMouseOut)
+        .on("click", handleClick)
+        .call(drag(simulation));
+
+      // --- Simulation tick ---
+      simulation.on("tick", () => {
+        link
+          .attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y);
+
+        node
+          .attr("cx", d => d.x = Math.max(10, Math.min(width - 10, d.x)))
+          .attr("cy", d => d.y = Math.max(10, Math.min(height - 10, d.y)));
+      });
+
+      // --- Interactions ---
+
+      function handleMouseOver(event, d) {
+        const aff = d.affiliation;
+
+        node
+          .transition().duration(150)
+          .style("opacity", n => (n.affiliation === aff ? 1 : 0.2));
+
+        link
+          .transition().duration(150)
+          .style("opacity", l =>
+            (l.source.affiliation === aff && l.target.affiliation === aff)
+              ? 0.5 : 0.05
+          );
+      }
+
+      function handleMouseOut() {
+        node
+          .transition().duration(180)
+          .style("opacity", 1);
+
+        link
+          .transition().duration(180)
+          .style("opacity", 0.16);
+      }
+
+      function handleClick(event, d) {
+        const x = event.clientX + 14;
+        const y = event.clientY + 14;
+
+        tooltip
+          .style("left", `${x}px`)
+          .style("top", `${y}px`)
+          .html(`
+            <div class="name">${d.name}</div>
+            <div class="affiliation">${d.affiliation}</div>
+            <div class="meta">
+              <div>Country: <strong>${d.country}</strong></div>
+              <div>Degree (co-authors): <strong>${d.degree}</strong></div>
+              <div>Papers (approx.): <strong>${d.paperCount}</strong></div>
+            </div>
+          `)
+          .style("opacity", 1)
+          .style("transform", "translateY(0px)");
+
+        // hide on next click outside
+        d3.select("body").on("click.tooltip-hide", (ev) => {
+          if (!ev.target.closest("#tooltip") && ev.target !== event.target) {
+            tooltip
+              .style("opacity", 0)
+              .style("transform", "translateY(6px)");
+            d3.select("body").on("click.tooltip-hide", null);
+          }
+        }, true);
+      }
+
+      // Drag behavior
+      function drag(sim) {
+        function dragstarted(event, d) {
+          if (!event.active) sim.alphaTarget(0.2).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        }
+        function dragged(event, d) {
+          d.fx = event.x;
+          d.fy = event.y;
+        }
+        function dragended(event, d) {
+          if (!event.active) sim.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        }
+        return d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended);
+      }
+
+      // --- Force control bindings ---
+      chargeSlider.on("input", function () {
+        chargeStrength = +this.value;
+        updateControlLabels();
+        simulation.force("charge").strength(chargeStrength);
+        simulation.alpha(0.6).restart();
+      });
+
+      collideSlider.on("input", function () {
+        collidePadding = +this.value;
+        updateControlLabels();
+        simulation.force("collide",
+          d3.forceCollide().radius(d => rScale(d.degree) + collidePadding)
+        );
+        simulation.alpha(0.6).restart();
+      });
+
+      linkStrengthSlider.on("input", function () {
+        linkStrength = +this.value;
+        updateControlLabels();
+        simulation.force("link").strength(linkStrength);
+        simulation.alpha(0.6).restart();
+      });
+    }).catch(err => {
+      console.error(err);
+      statusEl.text("Error loading data_scopus.csv. Check path / filename and try again.");
+    });
+  </script>
+</body>
+</html>
